@@ -1,81 +1,73 @@
-function deepCopyObj(source, hash = new WeakMap()) {
-  // Проверяет примитивы и null/undefined
-  if (source === null || typeof source !== 'object') {
-    return source;
-  }
-
-  // Проверка на циклические ссылки
-  if (hash.has(source)) {
-    return hash.get(source);
-  }
-
-  // Проверка на Date
-  if (source instanceof Date) {
-    const clonedDate = new Date(source.getTime());
-    hash.set(source, clonedDate);
-    return clonedDate;
-  }
-
-  // Проверка на Map
-  if (source instanceof Map) {
-    const clonedMap = new Map();
-    hash.set(source, clonedMap);
-    
-    for (const [key, value] of source) {
-      clonedMap.set(deepClone(key, hash), deepClone(value, hash));
+function deepCopyObj(obj) {
+  function copy(value, valueCopy) {
+    // Проверка Примитивов, null, undefined, функции, символы
+    if (value === null || typeof value !== 'object') {
+      return value;
     }
-    
-    return clonedMap;
-  }
 
-  // Проверка на Set
-  if (source instanceof Set) {
-    const clonedSet = new Set();
-    hash.set(source, clonedSet);
-    
-    for (const value of source) {
-      clonedSet.add(deepClone(value, hash));
+    // Проверка циклических ссылок
+    if (valueCopy.has(value)) {
+      return valueCopy.get(value);
     }
-    
-    return clonedSet;
-  }
 
-  // Проверка массива
-  if (Array.isArray(source)) {
-    const clonedArray = [];
-    hash.set(source, clonedArray);
-    
-    for (let i = 0; i < source.length; i++) {
-      clonedArray[i] = deepClone(source[i], hash);
-    }
-    
-    return clonedArray;
-  }
+    // Провека на объект
+    const proto = Object.getPrototypeOf(value);
+    const objCopy = Object.create(proto);
+    valueCopy.set(value, objCopy);
 
-  // Проверка обычных объектов
-  // Сохранtение прототипа исходного объекта
-  const clonedObject = Object.create(Object.getPrototypeOf(source));
-  hash.set(source, clonedObject);
-  
-  // Копируем все собственные свойства, включая неперечислимые и символы
-  const allProperties = [
-    ...Object.getOwnPropertyNames(source),
-    ...Object.getOwnPropertySymbols(source)
-  ];
-  
-  for (const key of allProperties) {
-    const descriptor = Object.getOwnPropertyDescriptor(source, key);
-    
-    if (descriptor) {
-      if (descriptor.value !== undefined) {
-        // Обычное свойство со значением
-        descriptor.value = deepClone(descriptor.value, hash);
+    // Проверка на Array
+    if (Array.isArray(value)) {
+      const arrayCopy = [];
+      valueCopy.set(value, arrayCopy);
+      for (let i = 0; i < value.length; i++) {
+        arrayCopy[i] = copy(value[i], valueCopy);
       }
-      // Свойства с геттером/сеттером оставляем как есть
-      
-      Object.defineProperty(clonedObject, key, descriptor);
+      return arrayCopy;
     }
+
+    //Проверка Date
+    if (value instanceof Date) {
+      const dateCopy = new Date(value);
+      valueCopy.set(value, dateCopy);
+      return dateCopy;
+    }
+
+    //Проверка Set
+    if (value instanceof Set) {
+      const setCopy = new Set();
+      valueCopy.set(value, setCopy);
+      for (const val of value) {
+        setCopy.add(copy(val, valueCopy));
+      }
+      return setCopy;
+    }
+
+    //Проверка Map
+    if (value instanceof Map) {
+      const mapCopy = new Map();
+      valueCopy.set(value, mapCopy);
+      for (const [key, val] of value) {
+        mapCopy.set(copy(key, valueCopy), copy(val, valueCopy));
+      }
+      return mapCopy;
+    }
+
+    const allProps = [
+      ...Object.getOwnPropertyNames(value),
+      ...Object.getOwnPropertySymbols(value)
+    ];
+
+    for (const key of allProps) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor) {
+        if (descriptor.value !== undefined &&
+          (typeof descriptor.value === 'object' || typeof descriptor.value === 'function')) {
+          descriptor.value = copy(descriptor.value, valueCopy);
+        }
+        Object.defineProperty(objCopy, key, descriptor);
+      }
+    }
+    return objCopy;
   }
-  
-  return clonedObject;
+  return copy(obj, new WeakMap());
 }
